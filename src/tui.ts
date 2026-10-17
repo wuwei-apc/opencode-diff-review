@@ -22,7 +22,7 @@ import type {
   TuiPluginContext,
   TuiToast,
 } from "./contracts.ts"
-import { createDiffPageController } from "./diffview.tsx"
+import type { DiffPageController } from "./diffview.tsx"
 import { writeTuiDiagnostics } from "./diagnostics.ts"
 import { positiveInteger, readTrackerOptions } from "./options.ts"
 import { stateDirFor } from "./store.ts"
@@ -625,10 +625,33 @@ export default Plugin.define({
       })
     }
 
-    let pageController: import("./diffview.tsx").DiffPageController | null = null
+    let pageController: DiffPageController | null = null
     let pageView: { file: number; hunk: number; line: number; scroll: number } | null = null
 
     const entriesNow = (): ChangeSummary[] => tracker.listPayload("all", "").entries
+
+    /**
+     * The IDEA page is JSX and needs `@opentui/solid` at *runtime*. A packaged
+     * install (npm/git) has no node_modules of its own and the host does not
+     * resolve that specifier for plugins, so importing it eagerly would take the
+     * whole `tui.ts` entry down (`Cannot find package '@opentui/solid'`). Load it
+     * on demand and fall back to the dialog panel when it is unavailable.
+     */
+    let pageModule: typeof import("./diffview.tsx") | null = null
+    let pageModuleLoaded = false
+
+    const loadPageModule = async (): Promise<typeof import("./diffview.tsx") | null> => {
+      if (pageModuleLoaded) return pageModule
+      pageModuleLoaded = true
+      try {
+        pageModule = await import("./diffview.tsx")
+        return pageModule
+      } catch (error) {
+        pageModule = null
+        console.warn(`[opencode-diff] 双栏页面不可用，改用对话框面板：${describe(error)}`)
+        return null
+      }
+    }
 
     /**
      * The IDEA workspace: a route page that owns browsing AND every operation, so
@@ -641,11 +664,15 @@ export default Plugin.define({
         return
       }
 
-      // Static import (top of file) instead of `await import()`: a dynamic import
-      // kept diffview.tsx out of the module graph, so editing the page never
-      // triggered a reload and every UI change appeared to have no effect.
+      const mod = await loadPageModule()
+      if (!mod) {
+        // No JSX runtime in this install: the dialog flow covers the same actions.
+        await openPanel()
+        return
+      }
+
       if (!pageController) {
-        pageController = createDiffPageController(context, {
+        pageController = mod.createDiffPageController(context, {
           list: entriesNow,
           load: (rel) => tracker.diffDetailPayload(rel),
           decide: (kind, rel, rowIndexes, updatedAt) => {
