@@ -1,6 +1,6 @@
 {
   "name": "opencode-diff-review",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Per-file AI change review for OpenCode v2: side-by-side diff, block/line/file/session revert.",
   "type": "module",
   "license": "MIT",
@@ -30,6 +30,7 @@
     "index.ts",
     "tui.ts",
     "src",
+    "tsconfig.json",
     "README.md",
     "教程.md",
     "使用文档.md",

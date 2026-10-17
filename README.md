@@ -80,7 +80,7 @@ OpenCode 会自动发现 `~/.config/opencode/plugins/<任意目录名>/`（项�
 
 ```powershell
 # 解压发布包（见第 8 节）到全局插件目录
-Expand-Archive .\opencode-diff-review-1.0.0.zip -DestinationPath $env:USERPROFILE\.config\opencode\plugins\
+Expand-Archive .\opencode-diff-review-1.0.1.zip -DestinationPath $env:USERPROFILE\.config\opencode\plugins\
 ```
 
 ```bash
@@ -310,7 +310,7 @@ test/                 bun test 单元测试
 ## 8. 发布包
 
 ```bash
-bun run package        # npm pack → dist/opencode-diff-review-1.0.0.tgz
+bun run package        # npm pack → dist/opencode-diff-review-1.0.1.tgz
 ```
 
 `npm pack` 会按 `package.json` 的 `files` 打包：`index.ts`、`tui.ts`、`src/`、`README.md`、
