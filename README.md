@@ -80,7 +80,7 @@ OpenCode 会自动发现 `~/.config/opencode/plugins/<任意目录名>/`（项�
 
 ```powershell
 # 解压发布包（见第 8 节）到全局插件目录
-Expand-Archive .\opencode-diff-review-1.0.1.zip -DestinationPath $env:USERPROFILE\.config\opencode\plugins\
+Expand-Archive .\opencode-diff-review-1.0.2.zip -DestinationPath $env:USERPROFILE\.config\opencode\plugins\
 ```
 
 ```bash
@@ -235,6 +235,11 @@ TUI 选项：
 **安装命令报 `Invalid global configuration`**
 `opencode.json` 写坏了（多余逗号、BOM、编码不是 UTF-8）。先 `opencode2 debug config` 确认能解析，再重试。
 
+**Plugins 面板里 `TUI` 是 failed，日志报 `Cannot find package 'react'`**
+≤ 1.0.1 的打包安装才会这样：`src/diffview.tsx` 的 JSX 被按 React 编译。Bun 只从**当前工作目录**读
+`tsconfig.json`，插件自己目录里的那份不会被采用，所以从 1.0.2 起改用逐文件 `/** @jsxImportSource @opentui/solid */`。
+升级：`opencode2 plugin update`。
+
 **快捷键按了没反应**
 和本机已有的 keybind 冲突，换个键（例如 `"keybind": "ctrl+shift+y"`），或者直接用 `/diff-review`。
 
@@ -310,7 +315,7 @@ test/                 bun test 单元测试
 ## 8. 发布包
 
 ```bash
-bun run package        # npm pack → dist/opencode-diff-review-1.0.1.tgz
+bun run package        # npm pack → dist/opencode-diff-review-1.0.2.tgz
 ```
 
 `npm pack` 会按 `package.json` 的 `files` 打包：`index.ts`、`tui.ts`、`src/`、`README.md`、

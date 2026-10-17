@@ -1,5 +1,12 @@
+/** @jsxImportSource @opentui/solid */
 /**
  * IDEA-style diff workspace: one route page that owns the whole review loop.
+ *
+ * The per-file `@jsxImportSource` pragma above is load-bearing, do not remove it:
+ * a packaged install lives outside this project, and Bun resolves tsconfig from
+ * the *current working directory*, never from the plugin's own directory. Without
+ * the pragma the JSX below compiles against React and the whole `tui.ts` entry
+ * fails to load in OpenCode with `Cannot find package 'react'`.
  *
  * Layout
  *   ┌ [▲][▼] 块 n/m   [同意块][不同意块][同意全部][不同意全部][刷新][返回] ┐
