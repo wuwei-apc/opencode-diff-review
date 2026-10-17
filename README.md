@@ -1,4 +1,4 @@
-# opencode-diff-review
+﻿# opencode-diff-review
 
 给 **OpenCode v2** 用的「AI 改了什么」逐文件查看与撤回插件。
 
@@ -15,7 +15,8 @@ AI 每写一次文件，插件就会在写入前保存一份原始内容快照�
 
 > 只依赖 OpenCode 自身，不需要 git 仓库，也不会动你的 `git index`。
 
-> **日常怎么用？看 [使用文档.md](使用文档.md)**（安装验证、面板操作、配置、排错、卸载）。
+> **第一次安装？看 [教程.md](教程.md)**（10 分钟：装 → 验收 → 第一次实战）。
+> **想了解每个界面细节？看 [使用文档.md](使用文档.md)**（面板操作、配置、排错、卸载）。
 > 本文件面向开发与安装方式说明。
 
 ---
@@ -179,7 +180,7 @@ TUI 选项：
 | 选项 | 默认值 | 说明 |
 | --- | --- | --- |
 | `keybind` | `"ctrl+shift+r"` | 快捷键；不想用就设成 `""`，只留 `/diff-review` |
-| `slash` | `"diff"` | 斜杠命令名 |
+| `slash` | `"diff-review"` | 斜杠命令名 |
 | `confirmRevert` | `true` | 撤回前二次确认 |
 | `viewLines` | `400` | diff 视图一次最多展示多少行 |
 
@@ -213,7 +214,7 @@ TUI 选项：
 **列表一直是空的**
 先确认服务端在采集：
 
-1. `opencode2 api get /api/plugin` 能看到 `opencode.diff.tracker` 与 `opencode.diff.tui`；
+1. `%TEMP%\opencode-diff-plugin\diag.json` 里 `stage` 为 `ready`、`hooksRegistered` 为 `true`；
 2. 数据目录里有条目：`~/.local/share/opencode/opencode-diff-plugin/v1/<hash>/`；
 3. 看服务端启动自检：`%TEMP%\opencode-diff-plugin\diag.json`，`hooksRegistered` 应为 `true`。
 
@@ -296,7 +297,7 @@ bun run package        # npm pack → dist/opencode-diff-review-1.0.0.tgz
 ```
 
 `npm pack` 会按 `package.json` 的 `files` 打包：`index.ts`、`tui.ts`、`src/`、`README.md`、
-`使用文档.md`、`LICENSE`。解包后即可作为插件目录使用（`tar -xzf …` → `~/.config/opencode/plugins/`）。
+`使用文档.md`、`教程.md`、`LICENSE`。解包后即可作为插件目录使用（`tar -xzf …` → `~/.config/opencode/plugins/`）。
 
 GitHub Release 里同时提供同名 `.zip`，内容相同，适合直接解压后丢进 `plugins/` 目录。
 
