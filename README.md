@@ -1,4 +1,4 @@
-﻿# opencode-diff-review
+# opencode-diff-review
 
 给 **OpenCode v2** 用的「AI 改了什么」逐文件查看与撤回插件。
 
@@ -55,6 +55,18 @@ AI 调用 write/edit/patch
 
 ## 2. 安装
 
+**最省事的一条命令**（OpenCode v2 自带的能力，装完 `opencode2 plugin list` 能看到 `opencode.diff.tracker`）：
+
+```powershell
+opencode2 plugin add git@github.com:wuwei-apc/opencode-diff-review.git
+```
+
+它会拉取仓库、装进 OpenCode 缓存目录，并在全局 `opencode.json` 里加一条 git 地址；
+升级 `opencode2 plugin update`，卸载 `opencode2 plugin remove git@github.com:wuwei-apc/opencode-diff-review.git`。
+这种方式只能用默认选项——要改快捷键、上限等，用下面的配置引用方式。
+
+完整的安装/验收教程见 [教程.md](教程.md)。
+
 插件由两个入口组成，必须放在同一个目录里：
 
 - `index.ts` — 服务端插件，负责采集（`tool.hook`）
@@ -62,7 +74,7 @@ AI 调用 write/edit/patch
 
 两者通过**磁盘上的共享仓库**交换数据，不依赖插件 RPC，所以**缺一不可**。
 
-### 方式 A：放进插件目录（推荐）
+### 方式 A：放进插件目录（零配置）
 
 OpenCode 会自动发现 `~/.config/opencode/plugins/<任意目录名>/`（项目级则是 `.opencode/plugins/`）：
 
@@ -214,9 +226,14 @@ TUI 选项：
 **列表一直是空的**
 先确认服务端在采集：
 
-1. `%TEMP%\opencode-diff-plugin\diag.json` 里 `stage` 为 `ready`、`hooksRegistered` 为 `true`；
-2. 数据目录里有条目：`~/.local/share/opencode/opencode-diff-plugin/v1/<hash>/`；
-3. 看服务端启动自检：`%TEMP%\opencode-diff-plugin\diag.json`，`hooksRegistered` 应为 `true`。
+1. `opencode2 plugin list` 能列出 `opencode.diff.tracker`；
+2. `%TEMP%\opencode-diff-plugin\diag.json` 里 `stage` 为 `ready`、`hooksRegistered` 为 `true`、`selfTest.ok` 为 `true`；
+3. 数据目录里有条目：`~/.local/share/opencode/opencode-diff-plugin/v1/<hash>/`。
+
+> `opencode2 api get /api/plugin` 在 2.0.32 上对本插件恒返回空数组，**不要**用它判断是否加载成功。
+
+**安装命令报 `Invalid global configuration`**
+`opencode.json` 写坏了（多余逗号、BOM、编码不是 UTF-8）。先 `opencode2 debug config` 确认能解析，再重试。
 
 **快捷键按了没反应**
 和本机已有的 keybind 冲突，换个键（例如 `"keybind": "ctrl+shift+y"`），或者直接用 `/diff-review`。
