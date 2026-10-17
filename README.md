@@ -168,10 +168,12 @@ npm install        # 或 bun install，装 devDependencies
 
 状态前缀：`M` 修改、`A` 新增、`D` 删除、`?` 基线缺失（不可撤回）。
 
-### 没有 `ui.router` 的构建
+### 只有一种交互
 
-老一些的 v2 构建不能内嵌页面，这时同一个入口会自动退化成 `dialog.select` 列表（文件 → 改动块 → 行），
-同意/不同意、撤回整个文件、撤回全部都在里面，功能不丢，只是没有双栏视图。
+2.0 起删掉了旧的 dialog 菜单：`ctrl+shift+r` 打开的就是 IDEA 双栏页，块 / 行 / 文件 / 全部的
+同意与不同意都在页面上完成。页面是 Solid JSX，`@opentui/solid` 与 `solid-js` 已放在
+`dependencies` 里，`opencode2 plugin add` 或 `npm install` 会装好；如果依赖缺失，插件会弹一条
+toast 说明原因（而不是静默失效）。缺少 `ui.router` 的构建会提示「无法打开双栏视图」。
 
 ---
 
@@ -193,8 +195,6 @@ TUI 选项：
 | --- | --- | --- |
 | `keybind` | `"ctrl+shift+r"` | 快捷键；不想用就设成 `""`，只留 `/diff-review` |
 | `slash` | `"diff-review"` | 斜杠命令名 |
-| `confirmRevert` | `true` | 撤回前二次确认 |
-| `viewLines` | `400` | diff 视图一次最多展示多少行 |
 
 ---
 
@@ -308,7 +308,8 @@ test/                 bun test 单元测试
   契约只是文件系统。v2 的 `client.rpc()` 在 CLI 侧会拒绝定义对象（`RPC is unavailable`），
   这条路已经放弃。
 - **v2 插件 API 仍是 beta**：`src/contracts.ts` 把依赖面收窄成一个小接口，其他文件不直接碰 SDK 类型，升级时只改一处。
-- **页面是可选能力**：拿不到 `ui.router` 时自动退化成 `dialog.select` 列表，面板不会因此失效。
+- **只有一条交互路径**：页面是唯一入口，不存在「页面不可用就退回菜单」的第二套逻辑，行为可预测；
+  页面依赖的 `@opentui/solid` / `solid-js` 是声明式运行时依赖，缺失时用 toast 明确报错。
 
 ---
 
