@@ -80,7 +80,7 @@ OpenCode 会自动发现 `~/.config/opencode/plugins/<任意目录名>/`（项�
 
 ```powershell
 # 解压发布包（见第 8 节）到全局插件目录
-Expand-Archive .\opencode-diff-review-2.0.0.zip -DestinationPath $env:USERPROFILE\.config\opencode\plugins\
+Expand-Archive .\opencode-diff-review-2.0.1.zip -DestinationPath $env:USERPROFILE\.config\opencode\plugins\
 ```
 
 ```bash
@@ -166,6 +166,9 @@ npm install        # 或 bun install，装 devDependencies
 | `ctrl+shift+u` / `ctrl+shift+d` | 向上 / 向下滚动（鼠标滚轮也可以） |
 | `ctrl+shift+q`、`Esc` | 退出页面回到对话 |
 
+页面内的快捷键**只在页面打开时生效**。页面关闭时插件完全不参与按键分发，`Esc` 仍然是 OpenCode 的
+「中断会话 / 收起补全」，`ctrl+shift+d` 仍然是输入框的「删除整行」。
+
 状态前缀：`M` 修改、`A` 新增、`D` 删除、`?` 基线缺失（不可撤回）。
 
 ### 只有一种交互
@@ -243,6 +246,12 @@ TUI 选项：
 **快捷键按了没反应**
 和本机已有的 keybind 冲突，换个键（例如 `"keybind": "ctrl+shift+y"`），或者直接用 `/diff-review`。
 
+**`Esc` 在对话里没反应（按了不能中断会话）**
+2.0.1 及更早版本有个 bug：页面快捷键注册在一个永远开启的全局层里，把 OpenCode 自己的 `Esc`
+（`session.interrupt` 中断会话 / `prompt.autocomplete.hide` 收起补全）和 `ctrl+shift+d`
+（`input.delete.line` 输入框删行）一起吞掉了。2.0.1 起，页面那一层只在 diff 页面打开时启用，
+页面关闭时插件完全不参与按键分发，宿主的快捷键原样可用。升级：`opencode2 plugin update`。
+
 **列表是空的，但文件确实被改过**
 那次写入多半不是通过文件工具完成的（例如 shell 命令），或者文件超过了 `maxFileBytes`。
 
@@ -316,7 +325,7 @@ test/                 bun test 单元测试
 ## 8. 发布包
 
 ```bash
-bun run package        # npm pack → dist/opencode-diff-review-2.0.0.tgz
+bun run package        # npm pack → dist/opencode-diff-review-2.0.1.tgz
 ```
 
 `npm pack` 会按 `package.json` 的 `files` 打包：`index.ts`、`tui.ts`、`src/`、`README.md`、

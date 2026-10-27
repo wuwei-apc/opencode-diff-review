@@ -1,6 +1,6 @@
 {
   "name": "opencode-diff-review",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Per-file AI change review for OpenCode v2: side-by-side diff, block/line/file/session revert.",
   "type": "module",
   "license": "MIT",

@@ -17,6 +17,7 @@ import { join } from "node:path"
 
 import serverPlugin from "../index.ts"
 import tuiPlugin from "../tui.ts"
+import type { KeymapCommand, KeymapLayer } from "../src/contracts.ts"
 import { readTrackerOptions } from "../src/options.ts"
 import { stateDirFor } from "../src/store.ts"
 import { ChangeTracker } from "../src/tracker.ts"
@@ -98,7 +99,7 @@ async function serverCycle(): Promise<void> {
 }
 
 async function tuiWiring(): Promise<void> {
-  const layers: Array<Array<{ id: string }>> = []
+  const layers: KeymapLayer[] = []
   const setup = setupOf(tuiPlugin, "tui.ts")
   const dispose = await setup.call(tuiPlugin, {
     options: {},
@@ -115,14 +116,22 @@ async function tuiWiring(): Promise<void> {
       },
     },
     keymap: {
-      layer: (factory: () => { commands: Array<{ id: string }> }) => {
-        layers.push(factory().commands)
+      layer: (factory: () => KeymapLayer) => {
+        layers.push(factory())
         return {}
       },
     },
   })
 
-  const ids = new Set(layers.flatMap((commands) => commands.map((command) => command.id)))
+  const find = (id: string): { layer: KeymapLayer; command: KeymapCommand } => {
+    for (const layer of layers) {
+      const command = layer.commands.find((item) => item.id === id)
+      if (command) return { layer, command }
+    }
+    throw new Error(`tui.ts must register the ${id} command`)
+  }
+
+  const ids = new Set(layers.flatMap((layer) => layer.commands.map((command) => command.id)))
   for (const id of [
     "opencode.diff.panel",
     "opencode.diff.next",
@@ -131,10 +140,49 @@ async function tuiWiring(): Promise<void> {
     "opencode.diff.reject",
     "opencode.diff.scroll.down",
     "opencode.diff.scroll.up",
+    "opencode.diff.back",
     "opencode.diff.back.esc",
   ]) {
     assert.ok(ids.has(id), `tui.ts must register the ${id} command`)
   }
+
+  /*
+   * The plugin must not swallow OpenCode's own keys. `Esc` is session.interrupt
+   * and `ctrl+shift+d` is input.delete.line, so the page layer is switched off
+   * while the page is closed and every page command hands the key back.
+   */
+  const page = find("opencode.diff.back.esc")
+  const enabled = page.layer.enabled
+  assert.equal(
+    typeof enabled === "function" ? enabled() : enabled,
+    false,
+    "the page keymap layer must be disabled while the diff page is closed",
+  )
+
+  for (const id of [
+    "opencode.diff.next",
+    "opencode.diff.prev",
+    "opencode.diff.accept",
+    "opencode.diff.reject",
+    "opencode.diff.scroll.down",
+    "opencode.diff.scroll.up",
+    "opencode.diff.back",
+    "opencode.diff.back.esc",
+  ]) {
+    const { command } = find(id)
+    assert.equal(
+      command.run(),
+      false,
+      `the ${id} command must return false so the host keeps the key`,
+    )
+  }
+
+  const panel = find("opencode.diff.panel")
+  assert.equal(
+    panel.layer.enabled === undefined || panel.layer.enabled === true,
+    true,
+    "the panel toggle layer must stay active while the diff page is closed",
+  )
 
   if (typeof dispose === "function") await dispose()
 }

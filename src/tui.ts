@@ -26,8 +26,10 @@ import { ChangeTracker } from "./tracker.ts"
 import type { ChangeStatus, ChangeSummary } from "./types.ts"
 
 const COMMAND_ID = "opencode.diff.panel"
-// `ctrl+shift+d` collides with the built-in `input.delete.line`, so the panel uses
-// `ctrl+shift+r` (review): unused by the built-ins and distinct from the page keys.
+// The panel toggle uses `ctrl+shift+r` (review): unused by the built-ins and
+// distinct from the page keys. `ctrl+shift+d` is NOT free — it is the built-in
+// `input.delete.line` — so the page layer may only claim it while the diff page
+// is actually open (see the layer-level `enabled` further down).
 const DEFAULT_KEYBIND = "ctrl+shift+r"
 const DEFAULT_SLASH = "diff-review"
 
@@ -118,6 +120,22 @@ export default Plugin.define({
 
     let pageController: DiffPageController | null = null
     let pageView: { file: number; hunk: number; line: number; scroll: number } | null = null
+
+    /**
+     * Whether the diff page is on screen.
+     *
+     * This single flag is what keeps the plugin out of the host's way. The page
+     * keybindings live in their own layer and that layer is only enabled while
+     * the page is up, so `Esc` (session.interrupt, prompt.autocomplete.hide) and
+     * `ctrl+shift+d` (input.delete.line) stay OpenCode's alone whenever the
+     * plugin has nothing to do with them.
+     *
+     * The router is deliberately not consulted: it can lag behind the navigation
+     * we just triggered, and a wrong "closed" answer would disable the page keys
+     * while the page is on screen.
+     */
+    const isPageOpen = (): boolean =>
+      pageView !== null || pageController?.isOpen() === true
 
     const entriesNow = (): ChangeSummary[] => tracker.listPayload("all", "").entries
 
@@ -239,69 +257,76 @@ export default Plugin.define({
     /**
      * Scroll the diff viewport. The page renders only a visible window (932 rows of
      * nodes made the renderer miss its frame budget), so scrolling is state-driven.
+     *
+     * Every page action answers with "did I actually do something": `false` means
+     * the key was not ours to handle and must go back to the host.
      */
-    const pageScroll = (delta: number): void => {
-      if (!pageView) return
+    const pageScroll = (delta: number): boolean => {
+      if (!pageView) return false
       const next = Math.max(0, pageView.scroll + delta)
-      if (next === pageView.scroll) return
+      if (next === pageView.scroll) return false
       pageView.scroll = next
       pageShow()
+      return true
     }
 
-    const pageMoveHunk = (delta: number): void => {
-      if (!pageView) return
+    const pageMoveHunk = (delta: number): boolean => {
+      if (!pageView) return false
       const entries = entriesNow()
       const entry = entries[pageView.file]
-      if (!entry) return
+      if (!entry) return false
       const count = tracker.diffDetailPayload(entry.relPath).hunks.length
-      if (count === 0) return
+      if (count === 0) return false
       pageView.hunk = (pageView.hunk + delta + count) % count
       pageView.line = -1
       pageShow()
+      return true
     }
 
-    const pageMoveLine = (delta: number): void => {
-      if (!pageView) return
+    const pageMoveLine = (delta: number): boolean => {
+      if (!pageView) return false
       const entries = entriesNow()
       const entry = entries[pageView.file]
-      if (!entry) return
+      if (!entry) return false
       const detail = tracker.diffDetailPayload(entry.relPath)
       const hunk = detail.hunks.find((item) => item.index === pageView?.hunk)
-      if (!hunk) return
+      if (!hunk) return false
       const count = hunk.rows.filter((row) => row.kind !== "context").length
-      if (count === 0) return
+      if (count === 0) return false
       // `line` indexes the block's changed rows, or -1 for "the whole block".
       // Stepping forward from -1 lands on the first row; stepping back wraps to last.
       const from = pageView.line < 0 ? (delta > 0 ? -1 : 0) : pageView.line
       pageView.line = (from + delta + count) % count
       pageShow()
+      return true
     }
 
-    const pageMoveFile = (delta: number): void => {
-      if (!pageView) return
+    const pageMoveFile = (delta: number): boolean => {
+      if (!pageView) return false
       const entries = entriesNow()
-      if (entries.length === 0) return
+      if (entries.length === 0) return false
       pageView.file = (pageView.file + delta + entries.length) % entries.length
       pageView.hunk = 0
       pageView.line = -1
       pageShow()
+      return true
     }
 
-    const pageDecide = (kind: Decision): void => {
-      if (!pageView) return
+    const pageDecide = (kind: Decision): boolean => {
+      if (!pageView) return false
       const entries = entriesNow()
       const entry = entries[pageView.file]
-      if (!entry) return
+      if (!entry) return false
       const detail = tracker.diffDetailPayload(entry.relPath)
       const hunk = detail.hunks.find((item) => item.index === pageView?.hunk)
-      if (!hunk) return
+      if (!hunk) return false
 
       const changed = hunk.rows.filter((row) => row.kind !== "context")
       const rows =
         pageView.line >= 0 && changed[pageView.line]
           ? [changed[pageView.line].rowIndex]
           : changed.map((row) => row.rowIndex)
-      if (rows.length === 0) return
+      if (rows.length === 0) return false
 
       const result =
         kind === "reject"
@@ -321,7 +346,7 @@ export default Plugin.define({
         const left = entriesNow().length
         if (left === 0) {
           leavePage()
-          return
+          return true
         }
         pageView.hunk = 0
       } else {
@@ -329,20 +354,22 @@ export default Plugin.define({
       }
       pageView.line = -1
       pageShow()
+      return true
     }
 
     /** Whole-file decision for the file currently selected in the tree. */
-    const pageFileAction = (kind: Decision): void => {
-      if (!pageView) return
+    const pageFileAction = (kind: Decision): boolean => {
+      if (!pageView) return false
       const entry = entriesNow()[pageView.file]
-      if (!entry) return
+      if (!entry) return false
       if (kind === "reject" && !entry.revertable) {
         toast({
           title: "无法还原",
           message: "没有保存修改前内容（文件过大或被跳过）",
           variant: "warning",
         })
-        return
+        // The toast is the answer, so the key was handled after all.
+        return true
       }
 
       const result =
@@ -360,19 +387,27 @@ export default Plugin.define({
       const left = entriesNow()
       if (left.length === 0) {
         leavePage()
-        return
+        return true
       }
       pageView.file = Math.min(pageView.file, left.length - 1)
       pageView.hunk = 0
       pageView.line = -1
       pageShow()
+      return true
     }
 
-    const leavePage = (): void => {
+    /**
+     * Close the diff page.
+     *
+     * Returns false when there was no page to close, so the caller can hand the
+     * key back to OpenCode instead of swallowing it.
+     */
+    const leavePage = (): boolean => {
       // Never navigate away when no page is open: the back key must be a no-op then.
-      if (!pageView && !pageController?.isOpen()) return
+      if (!pageView && !pageController?.isOpen()) return false
       pageController?.back()
       pageView = null
+      return true
     }
 
     let busy = false
@@ -380,7 +415,7 @@ export default Plugin.define({
       if (busy) return
       busy = true
       try {
-        if (pageView || pageController?.isOpen()) {
+        if (isPageOpen()) {
           leavePage()
           return
         }
@@ -426,21 +461,44 @@ export default Plugin.define({
         bindings: [COMMAND_ID],
       }))
 
-      // In-page keys. Alt combos cannot be typed as text, so leaving them enabled is
-      // safe; each handler still no-ops unless the page is open.
-      const pageCommand = (id: string, title: string, bind: string, run: () => void) => ({
+      /**
+       * In-page keys.
+       *
+       * Every handler answers with "did I actually do something". When the answer
+       * is no the command returns `false`, and the host hands the key to the next
+       * binding instead of treating it as handled — that is what stops the plugin
+       * from swallowing OpenCode's own shortcuts.
+       */
+      const pageCommand = (
+        id: string,
+        title: string,
+        bind: string,
+        run: () => boolean,
+      ) => ({
         id,
         title,
         group: "Diff 页面",
         bind,
         palette: false,
         enabled: () => true,
-        run,
+        run: () => {
+          if (!run()) return false
+        },
       })
 
       layer(() => ({
         mode: "global",
         priority: 20,
+        /*
+         * The page layer is switched off whenever the diff page is not on screen.
+         *
+         * The host re-evaluates a layer's `enabled` on every key press, so with
+         * this off the plugin's `escape` and `ctrl+shift+d` bindings are not even
+         * considered and OpenCode keeps them: `Esc` stays session.interrupt /
+         * prompt.autocomplete.hide, and `ctrl+shift+d` stays input.delete.line.
+         * That is why the plugin used to break every Esc in the whole TUI.
+         */
+        enabled: () => isPageOpen(),
         commands: [
           pageCommand("opencode.diff.next", "下一处改动", "ctrl+shift+j", () => pageMoveHunk(1)),
           pageCommand("opencode.diff.scroll.down", "向下滚动", "ctrl+shift+d", () =>
@@ -464,7 +522,9 @@ export default Plugin.define({
           ),
           pageCommand("opencode.diff.back", "返回对话", "ctrl+shift+q", () => leavePage()),
           // Escape as a direct exit: while the diff page is showing it is the most
-          // obvious "get me out" key, so it takes precedence over interrupt.
+          // obvious "get me out" key, so it takes precedence over interrupt. The
+          // layer is off when the page is closed, so Esc keeps its OpenCode
+          // meaning (interrupt) everywhere else.
           pageCommand("opencode.diff.back.esc", "退出 diff 页面", "escape", () => leavePage()),
         ],
         bindings: [

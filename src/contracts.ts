@@ -95,6 +95,21 @@ export interface DialogAction {
   onTrigger?: (value: string) => unknown
 }
 
+/**
+ * The key event a command receives on keyboard dispatch.
+ *
+ * The plugin never inspects it; it exists so a command can tell "the user
+ * pressed a key" from "the host dispatched the command programmatically".
+ */
+export interface KeyEvent {
+  readonly name?: string
+  readonly ctrl?: boolean
+  readonly shift?: boolean
+  readonly meta?: boolean
+  readonly super?: boolean
+  readonly [key: string]: unknown
+}
+
 export interface KeymapCommand {
   id: string
   title: string
@@ -104,12 +119,23 @@ export interface KeymapCommand {
   suggested?: boolean
   slash?: { name: string; aliases?: string[]; arguments?: boolean }
   enabled?: () => boolean
-  run: (input?: string) => unknown
+  /**
+   * Returning `false` tells the host "this command did not handle the key" and
+   * lets the next binding run it. That is how a plugin hands a key back to
+   * OpenCode instead of swallowing it.
+   */
+  run: (input?: string, event?: KeyEvent) => void | false | Promise<void>
 }
 
 export interface KeymapLayer {
   mode?: string
   priority?: number
+  /**
+   * Disables the whole layer unless it resolves to true. The host re-evaluates
+   * this on every key press, so a layer can be switched off without being
+   * unregistered.
+   */
+  enabled?: boolean | (() => boolean)
   commands: KeymapCommand[]
   bindings?: string[]
 }
