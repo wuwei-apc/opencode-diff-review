@@ -15,9 +15,16 @@ AI 每写一次文件，插件就会在写入前保存一份原始内容快照�
 
 > 只依赖 OpenCode 自身，不需要 git 仓库，也不会动你的 `git index`。
 
-> **第一次安装？看 [教程.md](教程.md)**（10 分钟：装 → 验收 → 第一次实战）。
-> **想了解每个界面细节？看 [使用文档.md](使用文档.md)**（面板操作、配置、排错、卸载）。
-> 本文件面向开发与安装方式说明。
+**三份文档的分工**：
+
+| 文档 | 面向谁 | 装什么 |
+| --- | --- | --- |
+| [教程.md](教程.md) | 使用者 | **安装方式的唯一权威来源**：四种装法、验收、实战、升级卸载 |
+| [使用文档.md](使用文档.md) | 使用者 | 装好之后怎么用：界面细节、场景、配置、排错 |
+| README（本文件） | 维护者 | 原理、配置项、开发、**发布到 npm** |
+
+> **命令名说明**：本文统一用 `opencode` 指 **OpenCode v2** 的命令行。若你的机器上 v2 的可执行文件
+> 叫别的名字（例如和 v1 并存时的 `opencode2`），把命令里的 `opencode` 换成它即可。
 
 ---
 
@@ -55,80 +62,57 @@ AI 调用 write/edit/patch
 
 ## 2. 安装
 
-**最省事的一条命令**（OpenCode v2 自带的能力，装完 `opencode2 plugin list` 能看到 `opencode.diff.tracker`）：
+**一行命令**（OpenCode v2 自带的能力）：
 
-```powershell
-opencode2 plugin add git@github.com:wuwei-apc/opencode-diff-review.git
+```bash
+opencode plugin add opencode-diff-review
 ```
 
-它会拉取仓库、装进 OpenCode 缓存目录，并在全局 `opencode.json` 里加一条 git 地址；
-升级 `opencode2 plugin update`，卸载 `opencode2 plugin remove git@github.com:wuwei-apc/opencode-diff-review.git`。
-这种方式只能用默认选项——要改快捷键、上限等，用下面的配置引用方式。
+装完 `opencode plugin list` 能看到 `opencode.diff.tracker`：
 
-完整的安装/验收教程见 [教程.md](教程.md)。
+```
+ID                     VERSION  SOURCE
+opencode.diff.tracker  2.1.0    opencode-diff-review
+```
 
-插件由两个入口组成，必须放在同一个目录里：
+### 四种安装方式
+
+| 方式 | 命令 | 能配 options | 说明 |
+| --- | --- | --- | --- |
+| **① npm**（推荐） | `opencode plugin add opencode-diff-review` | ✗ | 从 npm 拉，装进 OpenCode 缓存目录 |
+| **② Git** | `opencode plugin add git@github.com:wuwei-apc/opencode-diff-review.git` | ✗ | 从 Git 仓库拉 |
+| **③ 配置引用** | `opencode.json` 里写 `{ "package": "/你的/插件目录", "options": { … } }` | ✓ | 插件放任意位置，**唯一能配选项**的方式 |
+| **④ 手动放目录** | 解压 `.tgz` 或 `git clone` 到 `~/.config/opencode/plugins/opencode-diff-review/` | ✗ | 零配置、可离线 |
+
+**只选一种**。装两种会被加载两次，每次改文件记两条。
+
+完整的安装步骤、作用域规则、镜像源处理、每种方式的升级与卸载，见 **[教程.md 第 2 节](教程.md#2-安装)**。
+
+### 插件的两个入口
+
+插件由两个入口组成，必须在**同一个包**里：
 
 - `index.ts` — 服务端插件，负责采集（`tool.hook`）
 - `tui.ts` — 终端面板，负责界面与快捷键
 
 两者通过**磁盘上的共享仓库**交换数据，不依赖插件 RPC，所以**缺一不可**。
-
-### 方式 A：放进插件目录（零配置）
-
-OpenCode 会自动发现 `~/.config/opencode/plugins/<任意目录名>/`（项目级则是 `.opencode/plugins/`）：
-
-```powershell
-# 解压发布包（见第 8 节）到全局插件目录
-Expand-Archive .\opencode-diff-review-2.0.1.zip -DestinationPath $env:USERPROFILE\.config\opencode\plugins\
-```
-
-```bash
-# 或者直接 clone
-git clone git@github.com:wuwei-apc/opencode-diff-review.git ~/.config/opencode/plugins/opencode-diff-review
-```
-
-最终结构：
-
-```
-~/.config/opencode/plugins/opencode-diff-review/
-├── index.ts        ← 服务端入口（必须有）
-├── tui.ts          ← TUI 入口（必须有）
-├── package.json
-└── src/
-```
-
-只要目录里同时有 `index.ts` 和 `tui.ts`，服务端与面板会被一起加载，选项取默认值。
-
-### 方式 B：显式写进配置
-
-把仓库放在任意位置，然后在 `opencode.json` 里显式引用（这样还能配选项）：
-
-```jsonc
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugins": [
-    {
-      "package": "D:/tools/opencode-diff-review",
-      "options": {
-        "keybind": "ctrl+shift+r",
-        "slash": "diff-review"
-      }
-    }
-  ]
-}
-```
-
-配置里出现一次的插件，如果同时带有 TUI 组件，CLI 会自动加载它，不需要在别处重复声明。
+OpenCode 按包的 `exports` 解析这两个入口（`"."` → 服务端，`"./tui"` → 面板），
+一条配置就把两个部分都加载起来。
 
 ### 关于依赖
 
-本地插件目录**不会**自动安装依赖，但 `@opencode/plugin`、`@opencode/plugin/tui`、`solid-js`、`@opentui/solid` 都由 OpenCode 运行时自带并解析，正常情况下你什么都不用装。
+`@opencode/plugin` 是插件自己的 `dependencies`；`@opentui/solid`、`@opentui/core`、`solid-js`
+声明为 `peerDependencies`——它们由 OpenCode 运行时提供，`opencode plugin add` 会自动装好，
+不会在你的机器上多出第二份 Solid 运行时。
+
+手动放目录（方式 ④）**不会自动装依赖**。正常情况不用管；如果面板报「找不到 `@opentui/solid`」，
+在该目录里跑一次 `npm install --omit=dev` 即可（这条命令依赖 `peerDependencies` 写的是版本范围而不是
+精确锁死，理由见第 7 节）。
 
 只有要自己跑类型检查 / 测试时才需要：
 
 ```bash
-npm install        # 或 bun install，装 devDependencies
+npm install        # 或 bun install
 ```
 
 ---
@@ -160,6 +144,7 @@ npm install        # 或 bun install，装 devDependencies
 | 键 | 作用 |
 | --- | --- |
 | `ctrl+shift+j` / `ctrl+shift+k` | 下一块 / 上一块 |
+| `ctrl+shift+n` / `ctrl+shift+m` | 块内下一行 / 上一行（选中行） |
 | `ctrl+shift+f` / `ctrl+shift+v` | 同意这块 / 不同意这块（逐行模式下只作用于选中行） |
 | `ctrl+shift+o` / `ctrl+shift+p` | 下一个文件 / 上一个文件 |
 | `ctrl+shift+w` / `ctrl+shift+x` | 同意整个文件 / 不同意整个文件 |
@@ -174,8 +159,8 @@ npm install        # 或 bun install，装 devDependencies
 ### 只有一种交互
 
 2.0 起删掉了旧的 dialog 菜单：`ctrl+shift+r` 打开的就是 IDEA 双栏页，块 / 行 / 文件 / 全部的
-同意与不同意都在页面上完成。页面是 Solid JSX，`@opentui/solid` 与 `solid-js` 已放在
-`dependencies` 里，`opencode2 plugin add` 或 `npm install` 会装好；如果依赖缺失，插件会弹一条
+同意与不同意都在页面上完成。页面是 Solid JSX，`@opentui/solid` 与 `solid-js` 已声明为
+`peerDependencies`，`opencode plugin add` 或 `npm install` 会装好；如果依赖缺失，插件会弹一条
 toast 说明原因（而不是静默失效）。缺少 `ui.router` 的构建会提示「无法打开双栏视图」。
 
 ---
@@ -229,28 +214,32 @@ TUI 选项：
 **列表一直是空的**
 先确认服务端在采集：
 
-1. `opencode2 plugin list` 能列出 `opencode.diff.tracker`；
+1. `opencode plugin list` 能列出 `opencode.diff.tracker`；
 2. `%TEMP%\opencode-diff-plugin\diag.json` 里 `stage` 为 `ready`、`hooksRegistered` 为 `true`、`selfTest.ok` 为 `true`；
 3. 数据目录里有条目：`~/.local/share/opencode/opencode-diff-plugin/v1/<hash>/`。
 
-> `opencode2 api get /api/plugin` 在 2.0.32 上对本插件恒返回空数组，**不要**用它判断是否加载成功。
+> `opencode api get /api/plugin` 在 2.0.32 和 2.2.0 上对本插件恒返回空数组，**不要**用它判断是否加载成功。
 
 **安装命令报 `Invalid global configuration`**
-`opencode.json` 写坏了（多余逗号、BOM、编码不是 UTF-8）。先 `opencode2 debug config` 确认能解析，再重试。
+`opencode.json` 写坏了（多余逗号、BOM、编码不是 UTF-8）。先 `opencode debug config` 确认能解析，再重试。
+
+**`opencode plugin add` 报 404 / ETARGET（npm 方式装不上）**
+你的 npm registry 是镜像源，包还没同步过去。`npm view opencode-diff-review` 确认一下，
+必要时 `npm config set registry https://registry.npmjs.org`。
 
 **Plugins 面板里 `TUI` 是 failed（`react` 或 `@opentui/solid` 找不到）**
-≤ 1.0.1 的打包安装才会这样：`src/diffview.tsx` 的 JSX 被按 React 编译。Bun 只从**当前工作目录**读
+≤ 1.0.2 的打包安装才会这样：`src/diffview.tsx` 的 JSX 被按 React 编译。Bun 只从**当前工作目录**读
 `tsconfig.json`，插件自己目录里的那份不会被采用，所以从 1.0.2 起改用逐文件 `/** @jsxImportSource @opentui/solid */`。
-升级：`opencode2 plugin update`。
+升级：`opencode plugin update`。
 
 **快捷键按了没反应**
 和本机已有的 keybind 冲突，换个键（例如 `"keybind": "ctrl+shift+y"`），或者直接用 `/diff-review`。
 
 **`Esc` 在对话里没反应（按了不能中断会话）**
-2.0.1 及更早版本有个 bug：页面快捷键注册在一个永远开启的全局层里，把 OpenCode 自己的 `Esc`
+2.0.0 及更早版本有个 bug：页面快捷键注册在一个永远开启的全局层里，把 OpenCode 自己的 `Esc`
 （`session.interrupt` 中断会话 / `prompt.autocomplete.hide` 收起补全）和 `ctrl+shift+d`
 （`input.delete.line` 输入框删行）一起吞掉了。2.0.1 起，页面那一层只在 diff 页面打开时启用，
-页面关闭时插件完全不参与按键分发，宿主的快捷键原样可用。升级：`opencode2 plugin update`。
+页面关闭时插件完全不参与按键分发，宿主的快捷键原样可用。升级：`opencode plugin update`。
 
 **列表是空的，但文件确实被改过**
 那次写入多半不是通过文件工具完成的（例如 shell 命令），或者文件超过了 `maxFileBytes`。
@@ -272,7 +261,7 @@ TUI 选项：
 ## 7. 开发
 
 ```bash
-bun test               # 单元测试（diff / paths / tracker / layout / tree）
+bun test               # 单元测试（diff / paths / tracker / layout / tree / tui-keymap）
 bun run smoke          # 入口冒烟：真实加载 index.ts + tui.ts，跑一遍采集→diff→撤回
 bunx tsc --noEmit      # 类型检查
 npm run check          # 上面三件事一起跑
@@ -319,19 +308,119 @@ test/                 bun test 单元测试
 - **v2 插件 API 仍是 beta**：`src/contracts.ts` 把依赖面收窄成一个小接口，其他文件不直接碰 SDK 类型，升级时只改一处。
 - **只有一条交互路径**：页面是唯一入口，不存在「页面不可用就退回菜单」的第二套逻辑，行为可预测；
   页面依赖的 `@opentui/solid` / `solid-js` 是声明式运行时依赖，缺失时用 toast 明确报错。
+- **运行时依赖走 `peerDependencies`**：`@opentui/solid`、`@opentui/core`、`solid-js` 由 OpenCode
+  提供，声明成 peer 可以避免装出第二份 Solid 运行时（两份运行时的 context 会错位）。
+  版本怎么写是有讲究的，**别随手改成精确锁死**：
+
+  | 包 | 声明 | 原因 |
+  | --- | --- | --- |
+  | `solid-js` | `1.9.12`（精确） | `@opentui/solid` 的**每一个**版本（0.6.6 / 0.6.8 / 0.7.0）对它的 peer 都是精确的 `1.9.12`。写成范围会让 npm 在 `@opentui/solid` 内部再嵌一份 `solid-js`，两份 Solid 运行时并存 → context 错位 |
+  | `@opentui/solid` / `@opentui/core` | `>=0.6.6 <0.8.0` | 这两个跟着**宿主的 OpenTUI 大版本**走：OpenCode 2.0.x 是 0.6.x，2.2.x 是 0.7.x。锁死成 `0.6.6` 会和 `@opencode/plugin@2.2.0` 的 `peerOptional @opentui/solid@0.7.0` 直接冲突，`npm install` 报 ERESOLVE 装不上 |
+
+  范围写宽之后，npm 会顺着 `@opencode/plugin` 的 peer 声明自动选到与宿主同一代的 OpenTUI，
+  整棵树里 `solid-js` 仍然只有一份。宿主升级 OpenTUI 时，只要不跳出 `0.8.0` 就**不用改这里**。
 
 ---
 
-## 8. 发布包
+## 8. 发布到 npm
+
+本插件就是一个普通 npm 包：**npm 包名 `opencode-diff-review`**，
+`exports` 把 `"."` 映射到服务端入口、`"./tui"` 映射到面板入口——这正是 OpenCode 官方约定的
+插件包结构。装的人只要一条 `opencode plugin add opencode-diff-review`。
+
+### 8.1 包结构
+
+`npm pack` 按 `package.json` 的 `files` 打包，共 24 个文件：
+`index.ts`、`tui.ts`、`src/`、`tsconfig.json`、`README.md`、`使用文档.md`、`教程.md`、`LICENSE`。
+测试和脚本不进包。
+
+发的是 **TypeScript 源码**而不是编译产物：OpenCode 跑在 Bun 上，直接加载 `.ts` 即可，
+用户不需要装构建链，也不会遇到「源码和编译产物不同步」。
+
+### 8.2 发布步骤
 
 ```bash
-bun run package        # npm pack → dist/opencode-diff-review-2.0.1.tgz
+npm install              # 装齐依赖
+npm run check            # 单测 + 入口冒烟 + 类型检查（publish 前必跑）
+
+npm run package          # → dist/opencode-diff-review-2.1.0.tgz，先看看包内容对不对
+npm publish              # 真正发出去
+npm view opencode-diff-review
 ```
 
-`npm pack` 会按 `package.json` 的 `files` 打包：`index.ts`、`tui.ts`、`src/`、`README.md`、
-`使用文档.md`、`教程.md`、`LICENSE`。解包后即可作为插件目录使用（`tar -xzf …` → `~/.config/opencode/plugins/`）。
+`npm publish` 会自动触发 `prepublishOnly`（也就是 `npm run check`），**测试没过就发不出去**。
 
-GitHub Release 里同时提供同名 `.zip`，内容相同，适合直接解压后丢进 `plugins/` 目录。
+`package.json` 里已经写死了发布目标：
+
+```jsonc
+"publishConfig": {
+  "access": "public",
+  "registry": "https://registry.npmjs.org"
+}
+```
+
+写死 registry 是有意的：很多人本地把 registry 指到镜像源（`npmmirror` 等），而镜像源不收包。
+**但这也意味着发布前必须先登录官方源**：
+
+```bash
+npm login --registry=https://registry.npmjs.org
+# 或者用 token（推荐，CI / 自动化场景）
+npm config set //registry.npmjs.org/:_authToken <TOKEN>
+```
+
+### 8.3 建议先发一个预发布版本
+
+`opencode plugin add` 不接受 tarball，所以 **npm 这条安装路径只能在发布之后才验证得了**。
+稳妥的做法是先发一个预发布版本，实测通过再发正式版：
+
+```bash
+npm version 2.1.0-rc.0        # 显式指定预发布版本号
+npm publish --tag next
+```
+
+> `npm version prerelease --preid=rc` 也能用，但它会把版本推到**下一个 patch** 的预发布
+> （`2.1.0` → `2.1.1-rc.0`），容易和正式版号对不上，发布前记得看一眼 `package.json`。
+
+然后在一台干净的机器上：
+
+```bash
+opencode plugin add opencode-diff-review@next
+opencode plugin list                     # 应显示 opencode.diff.tracker
+```
+
+确认面板能打开、`/diff-review` 有反应之后，再发正式版：
+
+```bash
+npm version 2.1.0
+npm publish                             # 默认 tag 是 latest
+```
+
+预发布版本带着 `-rc.0` 后缀，`opencode plugin add opencode-diff-review` **不会**自动装它
+（npm 默认 tag `latest` 指向正式版），要装预发布必须显式写 `@next`。
+
+### 8.4 版本号规则
+
+本项目用语义化版本：
+
+| 改动 | 版本位 |
+| --- | --- |
+| 修 bug、文档调整 | patch（`2.1.1`） |
+| 加功能、加安装方式 | minor（`2.2.0`） |
+| 改配置项语义、删功能 | major（`3.0.0`） |
+
+**每次发版都要同步三处**：`package.json` 的 `version`、本文档里的版本号示例、
+以及 `教程.md` / `使用文档.md` 里出现的版本号。
+
+### 8.5 GitHub Release
+
+GitHub Release 挂**同一个 `.tgz`**（`npm run package` 的产物）即可，用户可以：
+
+```bash
+tar -xzf opencode-diff-review-2.1.0.tgz -C ~/.config/opencode/plugins/
+mv ~/.config/opencode/plugins/package ~/.config/opencode/plugins/opencode-diff-review
+```
+
+`.tgz` 就是 gzip 压缩的 tar，Windows 10+ / macOS / Linux 都自带 `tar`，不用额外准备 zip。
 
 ## License
 

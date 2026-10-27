@@ -1,6 +1,6 @@
 {
   "name": "opencode-diff-review",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Per-file AI change review for OpenCode v2: side-by-side diff, block/line/file/session revert.",
   "type": "module",
   "license": "MIT",
@@ -24,7 +24,12 @@
   "exports": {
     ".": "./index.ts",
     "./tui": "./tui.ts",
-    "./types": "./src/types.ts"
+    "./types": "./src/types.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
   },
   "files": [
     "index.ts",
@@ -41,14 +46,21 @@
     "smoke": "bun run scripts/smoke.ts",
     "typecheck": "tsc --noEmit",
     "check": "bun test && bun run scripts/smoke.ts && tsc --noEmit",
-    "package": "npm pack --pack-destination dist"
+    "package": "npm pack --pack-destination dist",
+    "prepublishOnly": "npm run check"
   },
   "dependencies": {
-    "@opencode/plugin": ">=2.0.0",
-    "@opentui/solid": "0.6.6",
+    "@opencode/plugin": ">=2.0.0"
+  },
+  "peerDependencies": {
+    "@opentui/core": ">=0.6.6 <0.8.0",
+    "@opentui/solid": ">=0.6.6 <0.8.0",
     "solid-js": "1.9.12"
   },
   "devDependencies": {
+    "@opentui/core": ">=0.6.6 <0.8.0",
+    "@opentui/solid": ">=0.6.6 <0.8.0",
+    "solid-js": "1.9.12",
     "@types/node": "^22.10.0",
     "typescript": "^5.7.0"
   },
